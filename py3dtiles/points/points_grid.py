@@ -114,9 +114,8 @@ class Grid(object):
             rgb += (self.cells_rgb[i].ravel(),)
             pt += self.cells_xyz[i].shape[0]
 
-        if include_rgb:
-            res = np.concatenate((np.concatenate(xyz), np.concatenate(rgb)))
-            assert len(res) == pt * (3 * 4 + 3)
-            return res
-        else:
+        if not include_rgb:
             return np.concatenate(xyz)
+        res = np.concatenate((np.concatenate(xyz), np.concatenate(rgb)))
+        assert len(res) == pt * (3 * 4 + 3)
+        return res

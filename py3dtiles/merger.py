@@ -133,7 +133,7 @@ def _3dtiles_bounding_box_from_aabb(aabb, transform=None):
 
 
 def _aabb_from_3dtiles_bounding_volume(volume, transform=None):
-    center = np.array(volume['box'][0:3])
+    center = np.array(volume['box'][:3])
     h_x_axis = np.array(volume['box'][3:6])
     h_y_axis = np.array(volume['box'][6:9])
     h_z_axis = np.array(volume['box'][9:12])
@@ -154,12 +154,7 @@ def _aabb_from_3dtiles_bounding_volume(volume, transform=None):
 
 
 def build_tileset_quadtree(out_folder, aabb, tilesets, base_transform, inv_base_transform, name):
-    insides = []
-
-    for tileset in tilesets:
-        if is_tileset_inside(tileset, aabb):
-            insides += [tileset]
-
+    insides = [tileset for tileset in tilesets if is_tileset_inside(tileset, aabb)]
     quadtree_diag = np.linalg.norm(aabb[1][:2] - aabb[0][:2])
 
     if not insides:
@@ -184,10 +179,8 @@ def build_tileset_quadtree(out_folder, aabb, tilesets, base_transform, inv_base_
             'children': []
         }
 
-        sub = 0
-        for quarter in quadtree_split(aabb):
+        for sub, quarter in enumerate(quadtree_split(aabb)):
             r = build_tileset_quadtree(out_folder, quarter, insides, base_transform, inv_base_transform, name + str(sub))
-            sub += 1
             if r is not None:
                 result['children'] += [r]
 
@@ -226,7 +219,7 @@ def build_tileset_quadtree(out_folder, aabb, tilesets, base_transform, inv_base_
             out_folder,
             rgb.shape[0] > 0)[1]
         result['content'] = {'uri': os.path.relpath(filename, out_folder)}
-        result['geometricError'] = sum([t['root']['geometricError'] for t in insides])
+        result['geometricError'] = sum(t['root']['geometricError'] for t in insides)
         result['boundingVolume'] = _3dtiles_bounding_box_from_aabb(union_aabb, inv_base_transform)
 
         return result
@@ -254,12 +247,9 @@ def remove_tileset(tileset_filename):
     for content in contents:
         ext = os.path.splitext(content)[1][1:]
         if ext == 'pnts':
-            os.remove('{}/{}'.format(folder, content))
-        elif ext == 'json':
-            # remove_tileset('{}/{}'.format(folder, content))
-            pass
-        else:
-            raise Exception('unknown extension {}'.format(ext))
+            os.remove(f'{folder}/{content}')
+        elif ext != 'json':
+            raise Exception(f'unknown extension {ext}')
     os.remove(tileset_filename)
 
 
@@ -276,22 +266,21 @@ def init_parser(subparser, str2bool):
 
 
 def main(args):
-    dest = '{}/tileset.json'.format(args.folder)
+    dest = f'{args.folder}/tileset.json'
     if os.path.exists(dest):
         if args.overwrite:
             remove_tileset(dest)
         else:
-            print('Destination tileset {} already exists. Aborting'.format(dest))
+            print(f'Destination tileset {dest} already exists. Aborting')
             sys.exit(1)
 
     tilesets = []
     for root, dirs, files in os.walk(args.folder):
-        t = ['{}/{}'.format(root, f) for f in files if f == 'tileset.json']
-        if t:
+        if t := [f'{root}/{f}' for f in files if f == 'tileset.json']:
             tilesets += t
 
     if args.verbose >= 1:
-        print('Found {} tilesets to merge'.format(len(tilesets)))
+        print(f'Found {len(tilesets)} tilesets to merge')
     if args.verbose >= 2:
         print('Tilesets:', tilesets)
 
@@ -308,15 +297,13 @@ def main(args):
 
     result['transform'] = base_transform.T.reshape(16).tolist()
     tileset = {
-        'asset': {
-            'version': '1.0'
-        },
+        'asset': {'version': '1.0'},
         'refine': 'REPLACE',
-        'geometricError': np.linalg.norm((aabb[1] - aabb[0])[0:3]),
-        'root': result
+        'geometricError': np.linalg.norm((aabb[1] - aabb[0])[:3]),
+        'root': result,
     }
 
-    with open('{}/tileset.json'.format(args.folder), 'w') as f:
+    with open(f'{args.folder}/tileset.json', 'w') as f:
         json.dump(tileset, f)
 
 

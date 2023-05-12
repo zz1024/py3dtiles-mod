@@ -175,10 +175,10 @@ def isEarHashed(ear, minX, minY, size):
         return False # reflex, can't be an ear
 
     # triangle bbox; min & max are calculated like this for speed
-    minTX = (a.x if a.x < c.x else c.x) if a.x < b.x else (b.x if b.x < c.x else c.x)
-    minTY = (a.y if a.y < c.y else c.y) if a.y < b.y else (b.y if b.y < c.y else c.y)
-    maxTX = (a.x if a.x > c.x else c.x) if a.x > b.x else (b.x if b.x > c.x else c.x)
-    maxTY = (a.y if a.y > c.y else c.y) if a.y > b.y else (b.y if b.y > c.y else c.y)
+    minTX = min(a.x, c.x) if a.x < b.x else min(b.x, c.x)
+    minTY = min(a.y, c.y) if a.y < b.y else min(b.y, c.y)
+    maxTX = max(a.x, c.x) if a.x > b.x else max(b.x, c.x)
+    maxTY = max(a.y, c.y) if a.y > b.y else max(b.y, c.y)
 
     # z-order range for the current triangle bbox;
     minZ = zOrder(minTX, minTY, minX, minY, size)
@@ -234,7 +234,7 @@ def splitEarcut(start, triangles, dim, minX, minY, size):
     do = True
     a = start
 
-    while do or a != start:
+    while do or a != a:
         do = False
         b = a.next.next
 
@@ -289,8 +289,7 @@ def compareX(a, b):
 
 # find a bridge between vertices that connects hole with an outer ring and and link it
 def eliminateHole(hole, outerNode):
-    outerNode = findHoleBridge(hole, outerNode)
-    if outerNode:
+    if outerNode := findHoleBridge(hole, outerNode):
         b = splitPolygon(outerNode, hole)
         filterPoints(b, b.next)
 
@@ -303,9 +302,7 @@ def findHoleBridge(hole, outerNode):
     qx = -math.inf
     m = None
 
-    # find a segment intersected by a ray from the hole's leftmost point to the left;
-    # segment's endpoint with lesser x will be potential connection point
-    while do or p != outerNode:
+    while do or p != p:
         do = False
         if hy <= p.y and hy >= p.next.y and p.next.y - p.y != 0:
             x = p.x + (hy - p.y) * (p.next.x - p.x) / (p.next.y - p.y)
@@ -362,10 +359,10 @@ def indexCurve(start, minX, minY, size):
     do = True
     p = start
 
-    while do or p != start:
+    while do or p != p:
         do = False
 
-        if p.z == None:
+        if p.z is None:
             p.z = zOrder(p.x, p.y, minX, minY, size)
 
         p.prevZ = p.prev
@@ -402,7 +399,7 @@ def sortLinked(_list):
             numMerges += 1
             q = p
             pSize = 0
-            for i in range(inSize):
+            for _ in range(inSize):
                 pSize += 1
                 q = q.nextZ
                 if not q:
@@ -412,25 +409,15 @@ def sortLinked(_list):
 
             while pSize > 0 or (qSize > 0 and q):
 
-                if pSize == 0:
+                if pSize == 0 or qSize != 0 and q and p.z > q.z:
                     e = q
                     q = q.nextZ
                     qSize -= 1
-
-                elif (qSize == 0 or not q):
-                    e = p
-                    p = p.nextZ
-                    pSize -= 1
-
-                elif (p.z <= q.z):
-                    e = p
-                    p = p.nextZ
-                    pSize -= 1
 
                 else:
-                    e = q
-                    q = q.nextZ
-                    qSize -= 1
+                    e = p
+                    p = p.nextZ
+                    pSize -= 1
 
                 if tail:
                     tail.nextZ = e
@@ -473,7 +460,7 @@ def getLeftmost(start):
     p = start
     leftmost = start
 
-    while do or p != start:
+    while do or p != leftmost:
         do = False
         if p.x < leftmost.x:
             leftmost = p
@@ -533,12 +520,12 @@ def locallyInside(a, b):
 # check if the middle point of a polygon diagonal is inside the polygon
 def middleInside(a, b):
     do = True
-    p = a
     inside = False
     px = (a.x + b.x) / 2
     py = (a.y + b.y) / 2
 
-    while do or p != a:
+    p = a
+    while do or p != p:
         do = False
         if ((p.y > py) != (p.next.y > py)) and (px < (p.next.x - p.x) * (py - p.y) / (p.next.y - p.y) + p.x):
             inside = not inside
@@ -685,9 +672,4 @@ def flatten(data):
     return result
 
 def unflatten(data):
-    result = []
-
-    for i in range(0, len(data), 3):
-        result.append(tuple(data[i:i + 3]))
-
-    return result
+    return [tuple(data[i:i + 3]) for i in range(0, len(data), 3)]

@@ -26,9 +26,7 @@ class SubdivisionType(Enum):
 def name_to_filename(working_dir, nameb, suffix=''):
     name = nameb.decode('ascii')
     fullpath = [name[i:i + 8] for i in range(0, len(name), 8)] if name else ['']
-    folder = '{}/{}/'.format(
-        working_dir,
-        '/'.join(fullpath[:-1]))
+    folder = f"{working_dir}/{'/'.join(fullpath[:-1])}/"
 
     if not os.path.exists(folder):
         try:
@@ -36,8 +34,7 @@ def name_to_filename(working_dir, nameb, suffix=''):
         except OSError as exc:
             print(exc)
 
-    filename = '{}r{}{}'.format(folder, fullpath[-1], suffix)
-    return filename
+    return f'{folder}r{fullpath[-1]}{suffix}'
 
 
 def compute_spacing(aabb):

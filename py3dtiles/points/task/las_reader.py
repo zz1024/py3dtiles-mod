@@ -40,7 +40,14 @@ def init(files, color_scale=None, srs_in=None, srs_out=None, fraction=100):
         if color_scale is None:
             if 'red' in f.point_format.lookup:
                 color_test_field = 'red'
-                if np.max(f.get_points()['point'][color_test_field][0:min(10000, f.header.count)]) > 255:
+                if (
+                    np.max(
+                        f.get_points()['point'][color_test_field][
+                            : min(10000, f.header.count)
+                        ]
+                    )
+                    > 255
+                ):
                     color_scale = 1.0 / 255
             else:
                 color_test_field = 'intensity'
@@ -57,7 +64,9 @@ def init(files, color_scale=None, srs_in=None, srs_out=None, fraction=100):
             output = subprocess.check_output(['pdal', 'info', '--summary', filename]).decode('utf-8')
             summary = json.loads(output)['summary']
             if 'srs' not in summary or 'proj4' not in summary['srs'] or not summary['srs']['proj4']:
-                raise SrsInMissingException('\'{}\' file doesn\'t contain srs information. Please use the --srs_in option to declare it.'.format(filename))
+                raise SrsInMissingException(
+                    f"\'{filename}\' file doesn\'t contain srs information. Please use the --srs_in option to declare it."
+                )
             srs_in = summary['srs']['proj4']
 
     return {
@@ -81,7 +90,7 @@ def run(_id, filename, offset_scale, portion, queue, transformer, verbose):
 
         step = min(point_count, max((point_count) // 10, 100000))
 
-        indices = [i for i in range(math.ceil((point_count) / step))]
+        indices = list(range(math.ceil((point_count) / step)))
 
         color_scale = offset_scale[3]
 

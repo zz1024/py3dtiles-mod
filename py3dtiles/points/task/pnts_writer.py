@@ -40,7 +40,7 @@ def points_to_pnts(name, points, out_folder, include_rgb):
 
     filename = name_to_filename(out_folder, name, '.pnts')
 
-    assert not os.path.exists(filename), '{} already written'.format(filename)
+    assert not os.path.exists(filename), f'{filename} already written'
 
     tile.save_as(filename)
 

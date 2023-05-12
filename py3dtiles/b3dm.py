@@ -51,7 +51,7 @@ class B3dm(TileContent):
         """
 
         # build tile header
-        h_arr = array[0:B3dmHeader.BYTELENGTH]
+        h_arr = array[:B3dmHeader.BYTELENGTH]
         h = B3dmHeader.from_array(h_arr)
 
         if h.tile_byte_length != len(array):

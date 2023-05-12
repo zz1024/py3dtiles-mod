@@ -46,8 +46,7 @@ class Node(object):
         else:
             sub_pickle['points'] = self.points
 
-        d = pdumps(sub_pickle)
-        return d
+        return pdumps(sub_pickle)
 
     def load_from_bytes(self, byt):
         sub_pickle = ploads(byt)
@@ -67,7 +66,7 @@ class Node(object):
         # fastpath
         if self.children is None:
             self.points.append((xyz, rgb))
-            count = sum([xyz.shape[0] for xyz, rgb in self.points])
+            count = sum(xyz.shape[0] for xyz, rgb in self.points)
             # stop subdividing if spacing is 1mm
             if count >= 20000 and self.spacing > 0.001 * scale:
                 self._split(node_catalog, scale)
@@ -90,9 +89,7 @@ class Node(object):
             self.pending_rgb += [reminder_rgb]
 
     def needs_balance(self):
-        if self.children is not None:
-            return self.grid.needs_balance()
-        return False
+        return self.grid.needs_balance() if self.children is not None else False
 
     def flush_pending_points(self, catalog, scale):
         for name, xyz, rgb in self._get_pending_points():
@@ -111,7 +108,7 @@ class Node(object):
         return result
 
     def get_pending_points_count(self):
-        return sum([xyz.shape[0] for xyz in self.pending_xyz])
+        return sum(xyz.shape[0] for xyz in self.pending_xyz)
 
     def _get_pending_points(self):
         if not self.pending_xyz:
@@ -135,7 +132,7 @@ class Node(object):
 
         # make sure all children nodes exist
         for child in childs:
-            name = '{}{}'.format(self.name.decode('ascii'), child).encode('ascii')
+            name = f"{self.name.decode('ascii')}{child}".encode('ascii')
             # create missing nodes, only for remembering they exist.
             # We don't want to serialize them
             # probably not needed...
@@ -157,31 +154,28 @@ class Node(object):
 
     def get_point_count(self, node_catalog, max_depth, depth=0):
         if self.children is None:
-            return sum([xyz.shape[0] for xyz, rgb in self.points])
-        else:
-            count = self.grid.get_point_count()
-            if depth < max_depth:
-                for n in self.children:
-                    count += node_catalog.get_node(n).get_point_count(
-                        node_catalog, max_depth, depth + 1)
-            return count
+            return sum(xyz.shape[0] for xyz, rgb in self.points)
+        count = self.grid.get_point_count()
+        if depth < max_depth:
+            for n in self.children:
+                count += node_catalog.get_node(n).get_point_count(
+                    node_catalog, max_depth, depth + 1)
+        return count
 
     @staticmethod
     def get_points(data, include_rgb):
-        if data.children is None:
-            points = data.points
-            xyz = np.concatenate(tuple([xyz for xyz, rgb in points])).view(np.uint8).ravel()
-            rgb = np.concatenate(tuple([rgb for xyz, rgb in points])).ravel()
-            count = sum([xyz.shape[0] for xyz, rgb in points])
-
-            if include_rgb:
-                result = np.concatenate((xyz, rgb))
-                assert len(result) == count * (3 * 4 + 3)
-                return result
-            else:
-                return xyz
-        else:
+        if data.children is not None:
             return data.grid.get_points(include_rgb)
+        points = data.points
+        xyz = np.concatenate(tuple(xyz for xyz, rgb in points)).view(np.uint8).ravel()
+        rgb = np.concatenate(tuple(rgb for xyz, rgb in points)).ravel()
+        count = sum(xyz.shape[0] for xyz, rgb in points)
+
+        if not include_rgb:
+            return xyz
+        result = np.concatenate((xyz, rgb))
+        assert len(result) == count * (3 * 4 + 3)
+        return result
 
     @staticmethod
     def to_tileset(executor, name, parent_aabb, parent_spacing, folder, scale):
@@ -213,9 +207,7 @@ class Node(object):
         if os.path.exists(ondisk_tile):
             tileset['content'] = {'uri': os.path.relpath(ondisk_tile, folder)}
         for child in ['0', '1', '2', '3', '4', '5', '6', '7']:
-            child_name = '{}{}'.format(
-                name.decode('ascii'),
-                child).encode('ascii')
+            child_name = f"{name.decode('ascii')}{child}".encode('ascii')
             child_ondisk_tile = name_to_filename(folder, child_name, '.pnts')
 
             if os.path.exists(child_ondisk_tile):
@@ -272,27 +264,26 @@ class Node(object):
         }
 
         if executor is not None:
-            children = [t for t in executor.map(node_to_tileset, children)]
+            children = list(executor.map(node_to_tileset, children))
 
         if children is not None:
             tileset['children'] = children
         else:
             tileset['geometricError'] = 0.0
 
-        if len(name) > 0 and children:
-            if len(json.dumps(tileset)) > 100000:
-                tile_root = {
-                    'asset': {
-                        'version': '1.0',
-                    },
-                    'refine': 'ADD',
-                    'geometricError': tileset['geometricError'],
-                    'root': tileset
-                }
-                tileset_name = 'tileset.{}.json'.format(name.decode('ascii'))
-                with open('{}/{}'.format(folder, tileset_name), 'w') as f:
-                    f.write(json.dumps(tile_root))
-                tileset['content'] = {'uri': tileset_name}
-                tileset['children'] = []
+        if len(name) > 0 and children and len(json.dumps(tileset)) > 100000:
+            tile_root = {
+                'asset': {
+                    'version': '1.0',
+                },
+                'refine': 'ADD',
+                'geometricError': tileset['geometricError'],
+                'root': tileset
+            }
+            tileset_name = f"tileset.{name.decode('ascii')}.json"
+            with open(f'{folder}/{tileset_name}', 'w') as f:
+                f.write(json.dumps(tile_root))
+            tileset['content'] = {'uri': tileset_name}
+            tileset['children'] = []
 
         return tileset

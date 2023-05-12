@@ -29,9 +29,7 @@ class TileContentReader(object):
 
     @staticmethod
     def read_array(array):
-        magic = ''.join([c.decode('UTF-8') for c in array[0:4].view('c')])
+        magic = ''.join([c.decode('UTF-8') for c in array[:4].view('c')])
         if magic == 'pnts':
             return Pnts.from_array(array)
-        if magic == 'b3dm':
-            return B3dm.from_array(array)
-        return None
+        return B3dm.from_array(array) if magic == 'b3dm' else None

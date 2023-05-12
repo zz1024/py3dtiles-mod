@@ -111,7 +111,7 @@ def arrays2tileset(positions, normals, bboxes, transform, ids=None):
     print("Creating tileset...")
     maxTileSize = 2000
     featuresPerTile = 20
-    indices = [i for i in range(len(positions))]
+    indices = list(range(len(positions)))
 
     # glTF is Y-up, so to get the bounding boxes in the 3D tiles
     # coordinate system, we have to apply a Y-to-Z transform to the
@@ -150,14 +150,21 @@ def arrays2tileset(positions, normals, bboxes, transform, ids=None):
                 if tile.inside(bbox.center()):
                     geoms.append(Feature(idx, bbox))
 
-            if len(geoms) == 0:
+            if not geoms:
                 continue
 
             if len(geoms) > featuresPerTile:
-                node = Node(geoms[0:featuresPerTile])
+                node = Node(geoms[:featuresPerTile])
                 tree.add(node)
-                divide(tile, geoms[featuresPerTile:len(geoms)], i * 2,
-                       j * 2, maxTileSize / 2., featuresPerTile, node)
+                divide(
+                    tile,
+                    geoms[featuresPerTile:],
+                    i * 2,
+                    j * 2,
+                    maxTileSize / 2.0,
+                    featuresPerTile,
+                    node,
+                )
             else:
                 node = Node(geoms)
                 tree.add(node)
@@ -203,19 +210,22 @@ def divide(extent, geometries, xOffset, yOffset, tileSize,
         for j in range(0, 2):
             tile = tile_extent(extent, tileSize, i, j)
 
-            geoms = []
-            for g in geometries:
-                if tile.inside(g.box.center()):
-                    geoms.append(g)
-            if len(geoms) == 0:
+            geoms = [g for g in geometries if tile.inside(g.box.center())]
+            if not geoms:
                 continue
 
             if len(geoms) > featuresPerTile:
-                node = Node(geoms[0:featuresPerTile])
+                node = Node(geoms[:featuresPerTile])
                 parent.add(node)
-                divide(tile, geoms[featuresPerTile:len(geoms)],
-                       (xOffset + i) * 2, (yOffset + j) * 2,
-                       tileSize / 2., featuresPerTile, node)
+                divide(
+                    tile,
+                    geoms[featuresPerTile:],
+                    (xOffset + i) * 2,
+                    (yOffset + j) * 2,
+                    tileSize / 2.0,
+                    featuresPerTile,
+                    node,
+                )
             else:
                 node = Node(geoms)
                 parent.add(node)
@@ -262,18 +272,14 @@ def from_db(db_conninfo, table_name, column_name, id_column_name):
               (float(extent[1][1]) + float(extent[0][1])) / 2,
               (float(extent[1][2]) + float(extent[0][2])) / 2]
 
-    id_statement = ""
-    if id_column_name is not None:
-        id_statement = "," + id_column_name
+    id_statement = f",{id_column_name}" if id_column_name is not None else ""
     cur.execute("SELECT ST_AsBinary(ST_RotateX(ST_Translate({0}, {1}, {2}, {3}), -pi() / 2)),"
                 "ST_Area(ST_Force2D({0})) AS weight{5} FROM {4} ORDER BY weight DESC"
                 .format(column_name, -offset[0], -offset[1], -offset[2],
                         table_name, id_statement))
     res = cur.fetchall()
     wkbs = [t[0] for t in res]
-    ids = None
-    if id_column_name is not None:
-        ids = [t[2] for t in res]
+    ids = [t[2] for t in res] if id_column_name is not None else None
     transform = np.array([
         [1, 0, 0, offset[0]],
         [0, 1, 0, offset[1]],
@@ -293,10 +299,8 @@ def from_directory(directory, offset):
     files = [f for f in files if os.path.isfile(f) and os.path.splitext(f)[1] == '.wkb']
     wkbs = []
     for f in files:
-        of = open(f, 'rb')
-        wkbs.append(of.read())
-        of.close()
-
+        with open(f, 'rb') as of:
+            wkbs.append(of.read())
     transform = np.array([
         [1, 0, 0, offset[0]],
         [0, 1, 0, offset[1]],

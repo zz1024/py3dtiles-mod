@@ -16,8 +16,9 @@ class GlTF(object):
         # body must be 4-byte aligned
         scene += ' ' * ((4 - len(scene) % 4) % 4)
 
-        padding = np.array([0 for i in range(0, (4 - len(self.body) % 4) % 4)],
-                           dtype=np.uint8)
+        padding = np.array(
+            [0 for _ in range(0, (4 - len(self.body) % 4) % 4)], dtype=np.uint8
+        )
 
         length = 28 + len(self.body) + len(scene) + len(padding)
         binaryHeader = np.array([0x46546C67,  # "glTF" magic
@@ -51,7 +52,7 @@ class GlTF(object):
 
         glTF = GlTF()
 
-        if struct.unpack("4s", array[0:4])[0] != b"glTF":
+        if struct.unpack("4s", array[:4])[0] != b"glTF":
             raise RuntimeError("Array does not contain a binary glTF")
 
         if struct.unpack("i", array[4:8])[0] != 1:
@@ -63,8 +64,9 @@ class GlTF(object):
         if struct.unpack("i", array[16:20])[0] != 0:
             raise RuntimeError("Unsupported binary glTF content type")
 
-        header = struct.unpack(str(content_length) + "s",
-                               array[20:20 + content_length])[0]
+        header = struct.unpack(
+            f"{str(content_length)}s", array[20 : 20 + content_length]
+        )[0]
         glTF.header = json.loads(header.decode("ascii"))
         glTF.body = array[20 + content_length:length]
 
@@ -152,10 +154,7 @@ def compute_header(binVertices, nVertices, bb, transform,
                    textured, batched, batchLength, uri, textureUri):
     # Buffer
     meshNb = len(binVertices)
-    sizeVce = []
-    for i in range(0, meshNb):
-        sizeVce.append(len(binVertices[i]))
-
+    sizeVce = [len(binVertices[i]) for i in range(0, meshNb)]
     byteLength = 2 * sum(sizeVce)
     if textured:
         byteLength += int(round(2 * sum(sizeVce) / 3))
@@ -168,20 +167,20 @@ def compute_header(binVertices, nVertices, bb, transform,
         buffers["binary_glTF"]["uri"] = uri
 
     # Buffer view
-    bufferViews = []
-    # vertices
-    bufferViews.append({
-        'buffer': 0,
-        'byteLength': sum(sizeVce),
-        'byteOffset': 0,
-        'target': 34962
-    })
-    bufferViews.append({
-        'buffer': 0,
-        'byteLength': sum(sizeVce),
-        'byteOffset': sum(sizeVce),
-        'target': 34962
-    })
+    bufferViews = [
+        {
+            'buffer': 0,
+            'byteLength': sum(sizeVce),
+            'byteOffset': 0,
+            'target': 34962,
+        },
+        {
+            'buffer': 0,
+            'byteLength': sum(sizeVce),
+            'byteOffset': sum(sizeVce),
+            'target': 34962,
+        },
+    ]
     if textured:
         bufferViews.append({
             'buffer': 0,
@@ -201,36 +200,40 @@ def compute_header(binVertices, nVertices, bb, transform,
     # Accessor
     accessors = []
     for i in range(0, meshNb):
-        # vertices
-        accessors.append({
-            'bufferView': 0,
-            'byteOffset': sum(sizeVce[0:i]),
-            'componentType': 5126,
-            'count': nVertices[i],
-            'min': [bb[i][0][0], bb[i][0][1], bb[i][0][2]],
-            'max': [bb[i][1][0], bb[i][1][1], bb[i][1][2]],
-            'type': "VEC3"
-        })
-        # normals
-        accessors.append({
-            'bufferView': 1,
-            'byteOffset': sum(sizeVce[0:i]),
-            'componentType': 5126,
-            'count': nVertices[i],
-            'max': [1, 1, 1],
-            'min': [-1, -1, -1],
-            'type': "VEC3"
-        })
+        accessors.extend(
+            (
+                {
+                    'bufferView': 0,
+                    'byteOffset': sum(sizeVce[:i]),
+                    'componentType': 5126,
+                    'count': nVertices[i],
+                    'min': [bb[i][0][0], bb[i][0][1], bb[i][0][2]],
+                    'max': [bb[i][1][0], bb[i][1][1], bb[i][1][2]],
+                    'type': "VEC3",
+                },
+                {
+                    'bufferView': 1,
+                    'byteOffset': sum(sizeVce[:i]),
+                    'componentType': 5126,
+                    'count': nVertices[i],
+                    'max': [1, 1, 1],
+                    'min': [-1, -1, -1],
+                    'type': "VEC3",
+                },
+            )
+        )
         if textured:
-            accessors.append({
-                'bufferView': 2,
-                'byteOffset': int(round(2 / 3 * sum(sizeVce[0:i]))),
-                'componentType': 5126,
-                'count': sum(nVertices),
-                'max': [1, 1],
-                'min': [0, 0],
-                'type': "VEC2"
-            })
+            accessors.append(
+                {
+                    'bufferView': 2,
+                    'byteOffset': int(round(2 / 3 * sum(sizeVce[:i]))),
+                    'componentType': 5126,
+                    'count': sum(nVertices),
+                    'max': [1, 1],
+                    'min': [0, 0],
+                    'type': "VEC2",
+                }
+            )
     if batched:
         accessors.append({
             'bufferView': 3 if textured else 2,
@@ -262,14 +265,10 @@ def compute_header(binVertices, nVertices, bb, transform,
     if batched:
         meshes[0]['primitives'][0]['attributes']['_BATCHID'] = nAttributes
 
-    # Nodes
-    nodes = []
-    for i in range(0, meshNb):
-        nodes.append({
-            'matrix': [float(e) for e in transform],
-            'mesh': i
-        })
-
+    nodes = [
+        {'matrix': [float(e) for e in transform], 'mesh': i}
+        for i in range(0, meshNb)
+    ]
     # Materials
     materials = [{
         'pbrMetallicRoughness': {
@@ -280,20 +279,15 @@ def compute_header(binVertices, nVertices, bb, transform,
 
     # Final glTF
     header = {
-        'asset': {
-            "generator": "py3dtiles",
-            "version": "2.0"
-        },
+        'asset': {"generator": "py3dtiles", "version": "2.0"},
         'scene': 0,
-        'scenes': [{
-            'nodes': [i for i in range(0, len(nodes))]
-        }],
+        'scenes': [{'nodes': list(range(0, len(nodes)))}],
         'nodes': nodes,
         'meshes': meshes,
         'materials': materials,
         'accessors': accessors,
         'bufferViews': bufferViews,
-        'buffers': buffers
+        'buffers': buffers,
     }
 
     # Texture data
