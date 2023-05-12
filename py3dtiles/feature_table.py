@@ -121,10 +121,7 @@ class FeatureTableHeader(object):
         return np.frombuffer(json_str.encode('utf-8'), dtype=np.uint8)
 
     def to_json(self):
-        jsond = {}
-
-        # length
-        jsond['POINTS_LENGTH'] = self.points_length
+        jsond = {'POINTS_LENGTH': self.points_length}
 
         # rtc
         if self.rtc:
@@ -257,11 +254,7 @@ class FeatureTableHeader(object):
             fth.points_length = jsond["POINTS_LENGTH"]
 
         # RTC (Relative To Center)
-        if "RTC_CENTER" in jsond:
-            fth.rtc = jsond['RTC_CENTER']
-        else:
-            fth.rtc = None
-
+        fth.rtc = jsond['RTC_CENTER'] if "RTC_CENTER" in jsond else None
         return fth
 
 
@@ -375,7 +368,7 @@ class FeatureTable(object):
 
         # build feature table header
         fth_len = th.ft_json_byte_length
-        fth_arr = array[0:fth_len]
+        fth_arr = array[:fth_len]
         fth = FeatureTableHeader.from_array(fth_arr)
 
         # build feature table body

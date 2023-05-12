@@ -19,10 +19,7 @@ def getPixmapFromStr(base64_str:str, format:str = 'png') -> QtGui.QPixmap:
     ba = QByteArray(base64_str.encode())
     ba = QByteArray.fromBase64(ba)
     pix = QPixmap()
-    isOk = pix.loadFromData(ba, format)
-    if isOk:
-        return pix
-    return None
+    return pix if (isOk := pix.loadFromData(ba, format)) else None
 
 class Ui_PointCloudConverter(object):
     def setupUi(self, MainForm):
@@ -157,13 +154,14 @@ class PointCloudConverter(QWidget):
 
     @QtCore.Slot()
     def on_pushButton_run_clicked(self):
-        files = []
-        for i in range(self.ui.listWidget_las_files.count()):
-            files.append(self.ui.listWidget_las_files.item(i).text())
-        if len(files) == 0:
+        files = [
+            self.ui.listWidget_las_files.item(i).text()
+            for i in range(self.ui.listWidget_las_files.count())
+        ]
+        if not files:
             QMessageBox.critical(self, '错误', '请先添加需要转换的点云数据！')
             return
-        
+
         out_dir = self.ui.lineEdit_out.text()
         if len(out_dir) == 0:
             QMessageBox.critical(self, '错误', '需指定3DTiles的输出路径！')
@@ -180,11 +178,9 @@ class PointCloudConverter(QWidget):
             pass
         elif srs.startswith('PROJCS'):
             srs = self.ui.plainTextEdit_srs.toolTip()
-        elif srs.isnumeric():
-            pass
-        else:
-             QMessageBox.critical(self, '错误', '未识别的坐标系！')
-             return
+        elif not srs.isnumeric():
+            QMessageBox.critical(self, '错误', '未识别的坐标系！')
+            return
 
         self.ui.pushButton_run.setEnabled(False)
         self.convert(files, out_dir, srs)
@@ -194,8 +190,8 @@ class PointCloudConverter(QWidget):
         from py3dtiles.convert import convert
         total_memory_MB = int(psutil.virtual_memory().total / (1024 * 1024))
         if not output.endswith('/'):
-            output = output + '/'
-        output = output + '/output'
+            output = f'{output}/'
+        output = f'{output}/output'
         convert(files=fileList, outfolder=output, cache_size=total_memory_MB, srs_out='4978', srs_in=srs)
 
 
@@ -205,8 +201,7 @@ def main():
 
     #设置图标
     logo_png_str = "iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAN1wAADdcBQiibeAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAANKSURBVEiJtZU9bxxFHMZ/M/ty3tuNcznAUhIcn2RLWNg4ISCEIiW0NDQoFZ+AhiYV34GXnsoFLQUUhI4GS0gRFRISKDoCUQS2dXD2eXdm93ZnhuJ8lzuvzwYBT7Or0ezz+7/M/Bf+Z4nxc3d395M4jt/6t4bWWtXr9d5bXV29D+Afr0dRFN0VQlw63oSUkpPvf0ee52GtfRuYBRhjnBCCsixpNps450apCYFSiiAIzjSeDiJNU8eoOm4MEABKKRqNBkVRTD6oqopHj3/j+58eI4TgNHlScu3yM7xyfR0hBM45cRIAwNHREdZaoiiarJVlidKaTz/7Cim9uRncfm2T6xtrtUxnAEophBAYY0iSBGMMaZpSDXPefedNGo2FuYCV5cunlnEGsLCwQL/fJ4oiDg8PgVGTL8QRN7Y2CcOwZjDdq9M0A2i1WmRZxmAwwPM8nHNYa2m327XoyrIkiiKklDjn0FrjeV4NNAOIoohL7TY/dPfJiyFCSMIwpMoC/vzlYLLPViXrnTbD4XACkFKSZRlJkswHADz6w+ejB2uUZQlCIr0GnIjq5ef2ef9KgX98GEZHWaO1Jo7jswGhD1XWoyhr5Zyozx55/jxhGE4yyIscrTVVVZ0NeKlzgS/uNee7A93uIVmWURQFURQxHA6pqoosy87uwThd3x8tj2srpcQYg3MOIQTtdpu9vT3CMERrjbV2MgHG34516pCx1qKUwvM8PG90uYIgGJUiz0mShMXFRcqyJE1TiqIgSRKWlpZqXvUm/57y7a8BV5OCWy8E+L6PEIKqqrDW8uXXD9jvZ1hryLXGGkMQ+Ly6tcby8vL5gCd9wwf3LffupNy4FnBx8en511rT7f7MN9/9WDNypuL1m5u1EtUAW52Yj+8OKA4HFHkD5Y/uglIKrTUvrl3ljVs3a4ClZ9s18xmAtXY0FhYkdzYu8vDhPoPBAK31ZHOe52ysr7GyslIzGnvMBWRZVk6Pg2azSa/XA5icIt/3abVaKKVOBYyllJpchjHA7OzsfNjpdG5PRSMODg6CPM+lMUZ4nufiODZSyjOuIADl9vb254CDp//kBnAFqI/LURAeUAHmHPOxMuDJNACgOQfwT+UADQz/A6/z9RcwxHY0GcyfyAAAAABJRU5ErkJggg=="
-    pix = getPixmapFromStr(base64_str=logo_png_str, format='png')
-    if pix:
+    if pix := getPixmapFromStr(base64_str=logo_png_str, format='png'):
         window.setWindowIcon(QIcon(pix))
 
     window.show()

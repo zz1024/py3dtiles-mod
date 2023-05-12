@@ -21,8 +21,8 @@ def init(files, color_scale=None, srs_in=None, srs_out=None, fraction=100):
 
         count = 0
         seek_values = []
+        batch = 10000
         while True:
-            batch = 10000
             points = np.zeros((batch, 3))
 
             offset = f.tell()
@@ -65,9 +65,7 @@ def init(files, color_scale=None, srs_in=None, srs_out=None, fraction=100):
 
         if srs_out is not None and srs_in is None:
             raise Exception(
-                "'{}' file doesn't contain srs information. Please use the --srs_in option to declare it.".format(
-                    filename
-                )
+                f"'{filename}' file doesn't contain srs information. Please use the --srs_in option to declare it."
             )
 
     return {
@@ -94,68 +92,66 @@ def run(_id, filename, offset_scale, portion, queue, transformer, verbose):
     (*) See: https://docs.safe.com/fme/html/FME_Desktop_Documentation/FME_ReadersWriters/pointcloudxyz/pointcloudxyz.htm
     """
     try:
-        f = open(filename, "r")
+        with open(filename, "r") as f:
+            point_count = portion[1] - portion[0]
 
-        point_count = portion[1] - portion[0]
+            step = min(point_count, max((point_count) // 10, 100000))
 
-        step = min(point_count, max((point_count) // 10, 100000))
+            f.seek(portion[2])
 
-        f.seek(portion[2])
+            feature_nb = 7
 
-        feature_nb = 7
+            for _ in range(0, point_count, step):
+                points = np.zeros((step, feature_nb), dtype=np.float32)
 
-        for i in range(0, point_count, step):
-            points = np.zeros((step, feature_nb), dtype=np.float32)
+                for j in range(0, step):
+                    line = f.readline()
+                    if not line:
+                        points = np.resize(points, (j, feature_nb))
+                        break
+                    line_features = [float(s) for s in line.split(" ")]
+                    if len(line_features) == 3:
+                        line_features += [None] * 4  # Insert intensity and RGB
+                    elif len(line_features) == 4:
+                        line_features += [None] * 3  # Insert RGB
+                    elif len(line_features) == 6:
+                        line_features.insert(3, None)  # Insert intensity
+                    points[j] = line_features
 
-            for j in range(0, step):
-                line = f.readline()
-                if not line:
-                    points = np.resize(points, (j, feature_nb))
-                    break
-                line_features = [float(s) for s in line.split(" ")]
-                if len(line_features) == 3:
-                    line_features += [None] * 4  # Insert intensity and RGB
-                elif len(line_features) == 4:
-                    line_features += [None] * 3  # Insert RGB
-                elif len(line_features) == 6:
-                    line_features.insert(3, None)  # Insert intensity
-                points[j] = line_features
+                x, y, z = [points[:, c] for c in [0, 1, 2]]
 
-            x, y, z = [points[:, c] for c in [0, 1, 2]]
+                if transformer:
+                    x, y, z = transformer.transform(x, y, z)
 
-            if transformer:
-                x, y, z = transformer.transform(x, y, z)
+                x = (x + offset_scale[0][0]) * offset_scale[1][0]
+                y = (y + offset_scale[0][1]) * offset_scale[1][1]
+                z = (z + offset_scale[0][2]) * offset_scale[1][2]
 
-            x = (x + offset_scale[0][0]) * offset_scale[1][0]
-            y = (y + offset_scale[0][1]) * offset_scale[1][1]
-            z = (z + offset_scale[0][2]) * offset_scale[1][2]
+                coords = np.vstack((x, y, z)).transpose()
 
-            coords = np.vstack((x, y, z)).transpose()
+                if offset_scale[2] is not None:
+                    # Apply transformation matrix (because the tile's transform will contain
+                    # the inverse of this matrix)
+                    coords = np.dot(coords, offset_scale[2])
 
-            if offset_scale[2] is not None:
-                # Apply transformation matrix (because the tile's transform will contain
-                # the inverse of this matrix)
-                coords = np.dot(coords, offset_scale[2])
+                coords = np.ascontiguousarray(coords.astype(np.float32))
 
-            coords = np.ascontiguousarray(coords.astype(np.float32))
+                # Read colors: 3 last columns of the point cloud
+                colors = points[:, -3:].astype(np.uint8)
 
-            # Read colors: 3 last columns of the point cloud
-            colors = points[:, -3:].astype(np.uint8)
+                queue.send_multipart(
+                    [
+                        "".encode("ascii"),
+                        pdumps({"xyz": coords, "rgb": colors}),
+                        struct.pack(">I", len(coords)),
+                    ],
+                    copy=False,
+                )
 
-            queue.send_multipart(
-                [
-                    "".encode("ascii"),
-                    pdumps({"xyz": coords, "rgb": colors}),
-                    struct.pack(">I", len(coords)),
-                ],
-                copy=False,
-            )
+            queue.send_multipart([pdumps({"name": _id, "total": 0})])
+            # notify we're idle
+            queue.send_multipart([b""])
 
-        queue.send_multipart([pdumps({"name": _id, "total": 0})])
-        # notify we're idle
-        queue.send_multipart([b""])
-
-        f.close()
     except Exception as e:
         print("Exception while reading points from xyz file")
         print(e)

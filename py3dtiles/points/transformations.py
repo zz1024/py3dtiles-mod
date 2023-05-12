@@ -570,14 +570,13 @@ def projection_from_matrix(matrix, pseudo=False):
         # normal: unit eigenvector of M33.T corresponding to eigenvalue 0
         w, V = numpy.linalg.eig(M33.T)
         i = numpy.where(abs(numpy.real(w)) < 1e-8)[0]
-        if len(i):
-            # parallel projection
-            normal = numpy.real(V[:, i[0]]).squeeze()
-            normal /= vector_norm(normal)
-            return point, normal, direction, None, False
-        else:
+        if not len(i):
             # orthogonal projection, where normal equals direction vector
             return point, direction, None, None, False
+        # parallel projection
+        normal = numpy.real(V[:, i[0]]).squeeze()
+        normal /= vector_norm(normal)
+        return point, normal, direction, None, False
     else:
         # perspective projection
         i = numpy.where(abs(numpy.real(w)) > 1e-8)[0]
@@ -696,7 +695,7 @@ def shear_from_matrix(matrix):
     w, V = numpy.linalg.eig(M33)
     i = numpy.where(abs(numpy.real(w) - 1.0) < 1e-4)[0]
     if len(i) < 2:
-        raise ValueError('no two linear independent eigenvectors found %s' % w)
+        raise ValueError(f'no two linear independent eigenvectors found {w}')
     V = numpy.real(V[:, i]).squeeze().T
     lenorm = -1.0
     for i0, i1 in ((0, 1), (0, 2), (1, 2)):
@@ -1575,10 +1574,7 @@ class Arcball(object):
 
     def setaxes(self, *axes):
         """Set axes to constrain rotations."""
-        if axes is None:
-            self._axes = None
-        else:
-            self._axes = [unit_vector(axis) for axis in axes]
+        self._axes = None if axes is None else [unit_vector(axis) for axis in axes]
 
     @property
     def constrain(self):
@@ -1628,12 +1624,11 @@ def arcball_map_to_sphere(point, center, radius):
     v0 = (point[0] - center[0]) / radius
     v1 = (center[1] - point[1]) / radius
     n = v0*v0 + v1*v1
-    if n > 1.0:
-        # position outside of sphere
-        n = math.sqrt(n)
-        return numpy.array([v0/n, v1/n, 0.0])
-    else:
+    if n <= 1.0:
         return numpy.array([v0, v1, math.sqrt(1.0 - n)])
+    # position outside of sphere
+    n = math.sqrt(n)
+    return numpy.array([v0/n, v1/n, 0.0])
 
 
 def arcball_constrain_to_axis(point, axis):
@@ -1682,7 +1677,7 @@ _AXES2TUPLE = {
     'rzxy': (1, 1, 0, 1), 'ryxy': (1, 1, 1, 1), 'ryxz': (2, 0, 0, 1),
     'rzxz': (2, 0, 1, 1), 'rxyz': (2, 1, 0, 1), 'rzyz': (2, 1, 1, 1)}
 
-_TUPLE2AXES = dict((v, k) for k, v in _AXES2TUPLE.items())
+_TUPLE2AXES = {v: k for k, v in _AXES2TUPLE.items()}
 
 
 def vector_norm(data, axis=None, out=None):
@@ -1906,10 +1901,10 @@ def _import_module(name, package=None, warn=True, prefix='_py_', ignore='_'):
         if not package:
             module = import_module(name)
         else:
-            module = import_module('.' + name, package=package)
+            module = import_module(f'.{name}', package=package)
     except ImportError:
         if warn:
-            warnings.warn('failed to import module %s' % name)
+            warnings.warn(f'failed to import module {name}')
     else:
         for attr in dir(module):
             if ignore and attr.startswith(ignore):
@@ -1918,7 +1913,7 @@ def _import_module(name, package=None, warn=True, prefix='_py_', ignore='_'):
                 if attr in globals():
                     globals()[prefix + attr] = globals()[attr]
                 elif warn:
-                    warnings.warn('no Python implementation of ' + attr)
+                    warnings.warn(f'no Python implementation of {attr}')
             globals()[attr] = getattr(module, attr)
         return True
 

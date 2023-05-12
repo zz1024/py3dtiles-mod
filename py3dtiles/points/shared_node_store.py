@@ -36,7 +36,7 @@ class SharedNodeStore:
             return
 
         if verbose >= 2:
-            print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> CACHE CLEANING [{}]'.format(before))
+            print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> CACHE CLEANING [{before}]')
         self.remove_oldest_nodes(1 - max_size_MB / before)
         gc.collect()
 
@@ -66,7 +66,7 @@ class SharedNodeStore:
 
         filename = name_to_filename(self.folder, name)
         if meta is None:
-            assert os.path.exists(filename), '{} should exist'.format(filename)
+            assert os.path.exists(filename), f'{filename} should exist'
         else:
             self.memory_size['content'] -= getsizeof(meta)
             self.memory_size['content'] -= len(self.data[meta[1]])
@@ -102,10 +102,9 @@ class SharedNodeStore:
         return count
 
     def print_statistics(self):
-        print('Stats: Hits = {}, Miss = {}, New = {}'.format(
-            self.stats['hit'],
-            self.stats['miss'],
-            self.stats['new']))
+        print(
+            f"Stats: Hits = {self.stats['hit']}, Miss = {self.stats['miss']}, New = {self.stats['new']}"
+        )
 
 
 def _remove_all(store):

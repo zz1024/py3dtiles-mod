@@ -49,7 +49,7 @@ class Pnts(TileContent):
         """
 
         # build tile header
-        h_arr = array[0:PntsHeader.BYTELENGTH]
+        h_arr = array[:PntsHeader.BYTELENGTH]
         h = PntsHeader.from_array(h_arr)
 
         if h.tile_byte_length != len(array):
@@ -162,7 +162,7 @@ class PntsBody(TileBody):
 
         # build feature table
         ft_len = th.ft_json_byte_length + th.ft_bin_byte_length
-        ft_arr = array[0:ft_len]
+        ft_arr = array[:ft_len]
         ft = FeatureTable.from_array(th, ft_arr)
 
         # build batch table

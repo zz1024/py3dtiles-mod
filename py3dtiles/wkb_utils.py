@@ -26,9 +26,9 @@ class TriangleSoup:
         """
         multipolygons = [parse(bytes(wkb))]
 
-        for additionalWkb in associatedData:
-            multipolygons.append(parse(bytes(additionalWkb)))
-
+        multipolygons.extend(
+            parse(bytes(additionalWkb)) for additionalWkb in associatedData
+        )
         trianglesArray = [[] for _ in range(len(multipolygons))]
         for i in range(0, len(multipolygons[0])):
             polygon = multipolygons[0][i]
@@ -131,8 +131,7 @@ def faceAttributeToArray(triangles):
 def vertexAttributeToArray(triangles):
     array = []
     for face in triangles:
-        for vertex in face:
-            array.append(vertex)
+        array.extend(iter(face))
     return array
 
 
@@ -140,30 +139,30 @@ def parse(wkb):
     multipolygon = []
     # length = len(wkb)
     # print(length)
-    byteorder = struct.unpack('b', wkb[0:1])
+    byteorder = struct.unpack('b', wkb[:1])
     bo = '<' if byteorder[0] else '>'
-    geomtype = struct.unpack(bo + 'I', wkb[1:5])[0]
-    hasZ = (geomtype == 1006) or (geomtype == 1015)
+    geomtype = struct.unpack(f'{bo}I', wkb[1:5])[0]
+    hasZ = geomtype in [1006, 1015]
     # MultipolygonZ or polyhedralSurface
     pntOffset = 24 if hasZ else 16
     pntUnpack = 'ddd' if hasZ else 'dd'
-    geomNb = struct.unpack(bo + 'I', wkb[5:9])[0]
+    geomNb = struct.unpack(f'{bo}I', wkb[5:9])[0]
     # print(struct.unpack('b', wkb[9:10])[0])
     # print(struct.unpack('I', wkb[10:14])[0])   # 1003 (Polygon)
     # print(struct.unpack('I', wkb[14:18])[0])   # num lines
     # print(struct.unpack('I', wkb[18:22])[0])   # num points
     offset = 9
-    for i in range(0, geomNb):
+    for _ in range(0, geomNb):
         offset += 5  # struct.unpack('bI', wkb[offset:offset + 5])[0]
         # 1 (byteorder), 1003 (Polygon)
-        lineNb = struct.unpack(bo + 'I', wkb[offset:offset + 4])[0]
+        lineNb = struct.unpack(f'{bo}I', wkb[offset:offset + 4])[0]
         offset += 4
         polygon = []
-        for j in range(0, lineNb):
-            pointNb = struct.unpack(bo + 'I', wkb[offset:offset + 4])[0]
+        for _ in range(0, lineNb):
+            pointNb = struct.unpack(f'{bo}I', wkb[offset:offset + 4])[0]
             offset += 4
             line = []
-            for k in range(0, pointNb - 1):
+            for _ in range(0, pointNb - 1):
                 pt = np.array(struct.unpack(bo + pntUnpack, wkb[offset:offset
                               + pntOffset]), dtype=np.float32)
                 offset += pntOffset
